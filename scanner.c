@@ -123,7 +123,7 @@ static Token scan_identifier_or_keyword();
 static Token scan_operator();
 static Token next_token();
 
-// Function to scan a number token (handles both integers and floats)
+// Function to scan digits (handles both integers and floats)
 static Token scan_number()
 {
     Token t;
@@ -161,13 +161,233 @@ static Token scan_number()
     return t;
 }
 
+// Function to scan identifiers and keywords
+static Token scan_identifier_or_keyword()
+{
+    Token t;
+    t.line = line;
+    int i = 0;
+
+    // Since the current character is an alphabetic character or an underscore, continue consuming characters as long as they are alphabetic characters, digits or underscores and store them in the lexeme of the token
+    while (isalpha(current()) || isdigit(current()) || current() == '_')
+    {
+        t.lexeme[i++] = advance();
+    }
+    t.lexeme[i] = '\0';
+
+    // After consuming the characters, check if the lexeme matches any of the keywords and set the token type accordingly, if it does not match any keyword then set the token type to TOKEN_IDENTIFIER
+    if (strcmp(t.lexeme, "if") == 0)
+        t.type = TOKEN_IF;
+    else if (strcmp(t.lexeme, "else") == 0)
+        t.type = TOKEN_ELSE;
+    else if (strcmp(t.lexeme, "while") == 0)
+        t.type = TOKEN_WHILE;
+    else if (strcmp(t.lexeme, "for") == 0)
+        t.type = TOKEN_FOR;
+    else if (strcmp(t.lexeme, "in") == 0)
+        t.type = TOKEN_IN;
+    else if (strcmp(t.lexeme, "range") == 0)
+        t.type = TOKEN_RANGE;
+    else if (strcmp(t.lexeme, "and") == 0)
+        t.type = TOKEN_AND;
+    else if (strcmp(t.lexeme, "or") == 0)
+        t.type = TOKEN_OR;
+    else if (strcmp(t.lexeme, "not") == 0)
+        t.type = TOKEN_NOT;
+    else if (strcmp(t.lexeme, "print") == 0)
+        t.type = TOKEN_PRINT;
+    else if (strcmp(t.lexeme, "True") == 0)
+        t.type = TOKEN_TRUE;
+    else if (strcmp(t.lexeme, "False") == 0)
+        t.type = TOKEN_FALSE;
+    else
+        t.type = TOKEN_IDENTIFIER;
+
+    return t;
+}
+
+// Function to scan strings
+static Token scan_string()
+{
+    Token t;
+    t.line = line;
+    int i = 0;
+
+    // Consume the opening double quote and store it in the lexeme of the token
+    t.lexeme[i++] = advance();
+
+    // Continue consuming characters until we hit the closing double quote, end of file or a newline character and store them in the lexeme of the token
+    while (current() != '"' && current() != '\0' && current() != '\n')
+    {
+        if (i >= MAX_LEXEME - 2)
+        {
+            break;
+        }
+        t.lexeme[i++] = advance();
+    }
+
+    // Check the reason we stopped consuming characters:
+    //  Case 1: We hit the closing double quote thus this is a valid string token. Consume the closing double quote, terminate and set the token type to TOKEN_STRING
+    if (current() == '"')
+    {
+        t.lexeme[i++] = advance();
+        t.lexeme[i] = '\0';
+        t.type = TOKEN_STRING;
+        return t;
+    }
+
+    // Case 2: We hit an end of line or newline character before consuming a closing double quote thus this is an invalid string token. Terminate and set the token type to TOKEN_ERROR since this a string with an unterminated double quote
+    t.lexeme[i] = '\0';
+    t.type = TOKEN_ERROR;
+    return t;
+}
+
+// Function to scan operators and punctuators
+static Token scan_operator()
+{
+    Token t;
+    t.line = line;
+
+    // Consume the first operator character
+    char op = advance();
+
+    // Check the operator character and determine the token type accordingly, also handle two-character operators by peeking at the next character and consuming it if it matches
+    switch (op)
+    {
+
+    // Single-character operators:
+    // Case 1: The current character is an addition operator, set the token type to TOKEN_PLUS and the lexeme to "+"
+    case '+':
+        t.type = TOKEN_PLUS;
+        t.lexeme[0] = '+';
+        t.lexeme[1] = '\0';
+        break;
+
+    // Case 2: The current character is a subtraction operator, set the token type to TOKEN_MINUS and the lexeme to "-"
+    case '-':
+        t.type = TOKEN_MINUS;
+        t.lexeme[0] = '-';
+        t.lexeme[1] = '\0';
+        break;
+
+    // Case 3: The current character is a multiplication operator, set the token type to TOKEN_MULTIPLY and the lexeme to "*"
+    case '*':
+        t.type = TOKEN_MULTIPLY;
+        t.lexeme[0] = '*';
+        t.lexeme[1] = '\0';
+        break;
+
+    // Case 4: The current character is a division operator, set the token type to TOKEN_DIVIDE and the lexeme to "/"
+    case '/':
+        t.type = TOKEN_DIVIDE;
+        t.lexeme[0] = '/';
+        t.lexeme[1] = '\0';
+        break;
+
+    // Case 5: The current character is a left parenthesis, set the token type to TOKEN_LPAREN and the lexeme to "("
+    case '(':
+        t.type = TOKEN_LPAREN;
+        t.lexeme[0] = '(';
+        t.lexeme[1] = '\0';
+        break;
+
+    // Case 6: The current character is a right parenthesis, set the token type to TOKEN_RPAREN and the lexeme to ")"
+    case ')':
+        t.type = TOKEN_RPAREN;
+        t.lexeme[0] = ')';
+        t.lexeme[1] = '\0';
+        break;
+
+    // Case 7: The current character is a colon, set the token type to TOKEN_COLON and the lexeme to ":"
+    case ':':
+        t.type = TOKEN_COLON;
+        t.lexeme[0] = ':';
+        t.lexeme[1] = '\0';
+        break;
+
+    // Two-character operators:
+    // Case 8: The current character is a less than operator, check if the next character is an equals sign to determine if this is a less than or less than or equal to operator. If the next character is an equals sign, consume it, set the token type to TOKEN_LESS_EQUAL and the lexeme to "<=", otherwise set the token type to TOKEN_LESS_THAN and the lexeme to "<"
+    case '<':
+        if (current() == '=')
+        {
+            advance();
+            t.type = TOKEN_LESS_EQUAL;
+            strcpy(t.lexeme, "<=");
+        }
+        else
+        {
+            t.type = TOKEN_LESS_THAN;
+            t.lexeme[0] = '<';
+            t.lexeme[1] = '\0';
+        }
+        break;
+
+    // Case 9: The current character is a greater than operator, check if the next character is an equals sign to determine if this is a greater than or greater than or equal to operator. If the next character is an equals sign, consume it, set the token type to TOKEN_GREATER_EQUAL and the lexeme to ">=", otherwise set the token type to TOKEN_GREATER_THAN and the lexeme to ">"
+    case '>':
+        if (current() == '=')
+        {
+            advance();
+            t.type = TOKEN_GREATER_EQUAL;
+            strcpy(t.lexeme, ">=");
+        }
+        else
+        {
+            t.type = TOKEN_GREATER_THAN;
+            t.lexeme[0] = '>';
+            t.lexeme[1] = '\0';
+        }
+        break;
+
+    // Case 10: The current character is an equals sign, check if the next character is also an equals sign to determine if this is an equality operator or an assignment operator. If the next character is an equals sign, consume it, set the token type to TOKEN_EQUALS and the lexeme to "==", otherwise set the token type to TOKEN_ASSIGN and the lexeme to "="
+    case '=':
+        if (current() == '=')
+        {
+            advance();
+            t.type = TOKEN_EQUALS;
+            strcpy(t.lexeme, "==");
+        }
+        else
+        {
+            t.type = TOKEN_ASSIGN;
+            t.lexeme[0] = '=';
+            t.lexeme[1] = '\0';
+        }
+        break;
+
+    // Case 11: The current character is an exclamation mark, check if the next character is an equals sign to determine if this is a not equal operator. If the next character is an equals sign, consume it, set the token type to TOKEN_NOT_EQUAL and the lexeme to "!=", otherwise this is an invalid token since '!' alone does not have any meaning in MiniPy, set the token type to TOKEN_ERROR and the lexeme to "!"
+    case '!':
+        if (current() == '=')
+        {
+            advance();
+            t.type = TOKEN_NOT_EQUAL;
+            strcpy(t.lexeme, "!=");
+        }
+        else
+        {
+            t.type = TOKEN_ERROR;
+            t.lexeme[0] = '!';
+            t.lexeme[1] = '\0';
+        }
+        break;
+
+    // Default case: The current character does not match any valid operator or punctuator, set the token type to TOKEN_ERROR and the lexeme to the invalid character. It should be noted that this default case should never be reached since we only call scan_operator() when the current character is a valid operator or punctuator, but this is here as a safety measure
+    default:
+        t.type = TOKEN_ERROR;
+        t.lexeme[0] = op;
+        t.lexeme[1] = '\0';
+        break;
+    }
+
+    return t;
+}
+
 // Function that dispatches by looking at current character and route it to the appropriate DFA function.
 static Token next_token()
 {
     Token t;
 
     // Skip whitespace and tab characters and move to next character by calling advance()
-    while (current() == ' ' || current() == '\t')
+    while (current() == ' ' || current() == '\t' || current() == '\r')
     {
         advance();
     }
@@ -251,8 +471,8 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // Open the provided source file
-    FILE *f = fopen(argv[1], "r");
+    // Open the provided source file in binary mode
+    FILE *f = fopen(argv[1], "rb");
     if (!f)
     {
         printf("Error: cannot open file '%s'\n", argv[1]);
@@ -279,7 +499,7 @@ int main(int argc, char *argv[])
 
     // Loop function for scanning the source code and printing the line number, token type and the lexeme
     printf("%-8s  %-15s  %s\n", "Line", "Token Type", "Lexeme");
-    printf("─────────────────────────────────────────────\n");
+    printf("---------------------------------------------\n");
 
     Token t;
     do

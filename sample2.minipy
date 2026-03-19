@@ -1,0 +1,37 @@
+# MiniPy Sample Program 2
+# This program demonstrates the token types in MiniPy developed by Group 8
+
+score = 85
+passing_score = 50
+bonus = 1.5
+
+total = score + bonus * 2.0
+
+if total > passing_score:
+    print("Student has passed")
+else:
+    print("Student has failed")
+
+count = 0
+while count < 3:
+    count = count + 1
+    print(count)
+
+for i in range(5):
+    result = i * 2
+    print(result)
+
+is_eligible = True
+has_bonus = False
+
+if score >= 80 and not has_bonus:
+    print("High score")
+
+if score <= 90 or is_eligible:
+    print("Eligible")
+
+if score != 100:
+    print("Not perfect")
+
+if score == 85:
+    print("Exact match")
