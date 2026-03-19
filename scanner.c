@@ -24,7 +24,7 @@ static char peek_next()
 // Function to consume the current character and move to the next one
 static char advance()
 {
-    // Get the current character and move the position forward unless the charcater is the newline character then move to next line
+    // Get the current character and move the position forward unless the character is the newline character then move to next line
     char c = source[pos];
     pos++;
     if (c == '\n')
@@ -122,6 +122,123 @@ static Token scan_string();
 static Token scan_identifier_or_keyword();
 static Token scan_operator();
 static Token next_token();
+
+// Function to scan a number token (handles both integers and floats)
+static Token scan_number()
+{
+    Token t;
+    t.line = line;
+    int i = 0;
+
+    // Since the current character is a digit, continue consuming characters as long as they are digits and store them in the lexeme of the token
+    while (isdigit(current()))
+    {
+        t.lexeme[i++] = advance();
+    }
+
+    // Check if the next character is a dot followed by a digit to determine if this is a float or an integer
+    if (current() == '.' && isdigit(peek_next()))
+    {
+
+        // consume the dot
+        t.lexeme[i++] = advance();
+
+        // Consume the digits after the dot and store them in the lexeme of the token
+        while (isdigit(current()))
+        {
+            t.lexeme[i++] = advance();
+        }
+
+        // Null-terminate the lexeme string and set the token type to TOKEN_FLOAT since a dot followed by digits is found
+        t.lexeme[i] = '\0';
+        t.type = TOKEN_FLOAT;
+        return t;
+    }
+
+    // No dot is found after the digits so this is an integer token, null-terminate the lexeme string and set the token type to TOKEN_INTEGER
+    t.lexeme[i] = '\0';
+    t.type = TOKEN_INTEGER;
+    return t;
+}
+
+// Function that dispatches by looking at current character and route it to the appropriate DFA function.
+static Token next_token()
+{
+    Token t;
+
+    // Skip whitespace and tab characters and move to next character by calling advance()
+    while (current() == ' ' || current() == '\t')
+    {
+        advance();
+    }
+
+    // Recoord the line number the token is from
+    t.line = line;
+
+    // Handles when we reach the end of the file by outputting the EOF token
+    if (current() == '\0')
+    {
+        t.type = TOKEN_EOF;
+        strcpy(t.lexeme, "EOF");
+        return t;
+    }
+
+    // Handles when a newline character is scanned by outputting the newline token and moving to the next line
+    if (current() == '\n')
+    {
+        advance();
+        t.type = TOKEN_NEWLINE;
+        strcpy(t.lexeme, "\\n");
+        return t;
+    }
+
+    // Handles when a comment (anything starting with #) is scanned by skipping the whole line entirely
+    if (current() == '#')
+    {
+        while (current() != '\n' && current() != '\0')
+        {
+            advance();
+        }
+        // After skipping the comment, get the next real token by calling next_token()
+        return next_token();
+    }
+
+    // Handles when a digit is scanned by calling scan_number which will handle bith integers and floats
+    if (isdigit(current()))
+    {
+        return scan_number();
+    }
+
+    // Handles when an alphabetic character or an underscore is scanned by calling scan_identifier_or_keyword() which will handle both identifiers and keywords
+    if (isalpha(current()) || current() == '_')
+    {
+        return scan_identifier_or_keyword();
+    }
+
+    // Handles the situation when a double quote is scanned by calling scan_string() which will handles strings
+    if (current() == '"')
+    {
+        return scan_string();
+    }
+
+    // Handles when an operator or a punctuator is scanned by calling scan_operator() which will handle both operators and punctuators
+    if (current() == '+' || current() == '-' ||
+        current() == '*' || current() == '/' ||
+        current() == '=' || current() == '!' ||
+        current() == '<' || current() == '>' ||
+        current() == '(' || current() == ')' ||
+        current() == ':')
+    {
+        return scan_operator();
+    }
+
+    // A catch-all function which handles when the character scanned does not match any valid output by outputting an error token with the invalid chacter as the lexeme and moves to the next character by calling advance()
+    t.type = TOKEN_ERROR;
+    t.lexeme[0] = current();
+    t.lexeme[1] = '\0';
+    advance();
+    return t;
+}
 
 // Main function
 int main(int argc, char *argv[])
