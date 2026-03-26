@@ -44,59 +44,59 @@ const char *token_type_name(TokenType type)
     case TOKEN_STRING:
         return "STRING";
     case TOKEN_IF:
-        return "IF";
+        return "KEYWORD_IF";
     case TOKEN_ELSE:
-        return "ELSE";
+        return "KEYWORD_ELSE";
     case TOKEN_WHILE:
-        return "WHILE";
+        return "KEYWORD_WHILE";
     case TOKEN_FOR:
-        return "FOR";
+        return "KEYWORD_FOR";
     case TOKEN_IN:
-        return "IN";
+        return "KEYWORD_IN";
     case TOKEN_RANGE:
-        return "RANGE";
+        return "KEYWORD_RANGE";
     case TOKEN_AND:
-        return "AND";
+        return "KEYWORD_AND";
     case TOKEN_OR:
-        return "OR";
+        return "KEYWORD_OR";
     case TOKEN_NOT:
-        return "NOT";
+        return "KEYWORD_NOT";
     case TOKEN_PRINT:
-        return "PRINT";
+        return "KEYWORD_PRINT";
     case TOKEN_TRUE:
-        return "TRUE";
+        return "KEYWORD_TRUE";
     case TOKEN_FALSE:
-        return "FALSE";
+        return "KEYWORD_FALSE";
     case TOKEN_IDENTIFIER:
         return "IDENTIFIER";
     case TOKEN_PLUS:
-        return "PLUS";
+        return "OPERATOR_PLUS";
     case TOKEN_MINUS:
-        return "MINUS";
+        return "OPERATOR_MINUS";
     case TOKEN_MULTIPLY:
-        return "MULTIPLY";
+        return "OPERATOR_MULTIPLY";
     case TOKEN_DIVIDE:
-        return "DIVIDE";
+        return "OPERATOR_DIVIDE";
     case TOKEN_EQUALS:
-        return "EQUALS";
+        return "OPERATOR_EQUALS";
     case TOKEN_NOT_EQUAL:
-        return "NOT_EQUAL";
+        return "OPERATOR_NOT_EQUAL";
     case TOKEN_LESS_THAN:
-        return "LESS_THAN";
+        return "OPERATOR_LESS_THAN";
     case TOKEN_GREATER_THAN:
-        return "GREATER_THAN";
+        return "OPERATOR_GREATER_THAN";
     case TOKEN_LESS_EQUAL:
-        return "LESS_EQUAL";
+        return "OPERATOR_LESS_EQUAL";
     case TOKEN_GREATER_EQUAL:
-        return "GREATER_EQUAL";
+        return "OPERATOR_GREATER_EQUAL";
     case TOKEN_ASSIGN:
-        return "ASSIGN";
+        return "OPERATOR_ASSIGN";
     case TOKEN_LPAREN:
-        return "LPAREN";
+        return "PUNCTUATOR_LPAREN";
     case TOKEN_RPAREN:
-        return "RPAREN";
+        return "PUNCTUATOR_RPAREN";
     case TOKEN_COLON:
-        return "COLON";
+        return "PUNCTUATOR_COLON";
     case TOKEN_NEWLINE:
         return "NEWLINE";
     case TOKEN_EOF:
