@@ -50,7 +50,6 @@ typedef enum
     TOKEN_COLON,
 
     // Special tokens
-    TOKEN_NEWLINE,
     TOKEN_EOF,
     TOKEN_ERROR
 } TokenType;

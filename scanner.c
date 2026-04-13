@@ -97,8 +97,6 @@ const char *token_type_name(TokenType type)
         return "PUNCTUATOR_RPAREN";
     case TOKEN_COLON:
         return "PUNCTUATOR_COLON";
-    case TOKEN_NEWLINE:
-        return "NEWLINE";
     case TOKEN_EOF:
         return "EOF";
     case TOKEN_ERROR:
@@ -387,12 +385,15 @@ static Token next_token()
     Token t;
 
     // Skip whitespace and tab characters and move to next character by calling advance()
-    while (current() == ' ' || current() == '\t' || current() == '\r')
+    while (current() == ' ' || current() == '\t' ||
+           current() == '\r' || current() == '\n')
     {
+        if (current() == '\n')
+            line++;
         advance();
     }
 
-    // Recoord the line number the token is from
+    // Record the line number the token is from
     t.line = line;
 
     // Handles when we reach the end of the file by outputting the EOF token
@@ -400,15 +401,6 @@ static Token next_token()
     {
         t.type = TOKEN_EOF;
         strcpy(t.lexeme, "EOF");
-        return t;
-    }
-
-    // Handles when a newline character is scanned by outputting the newline token and moving to the next line
-    if (current() == '\n')
-    {
-        advance();
-        t.type = TOKEN_NEWLINE;
-        strcpy(t.lexeme, "\\n");
         return t;
     }
 
@@ -504,10 +496,13 @@ int main(int argc, char *argv[])
     Token t;
     do
     {
-        // Get the next token and print it
         t = next_token();
-        print_token(t);
-    } while (t.type != TOKEN_EOF); // Ensure we stop at the end of the file
+        // Only print real tokens — EOF is internal only
+        if (t.type != TOKEN_EOF)
+        {
+            print_token(t);
+        }
+    } while (t.type != TOKEN_EOF);
 
     free(source);
     return 0;

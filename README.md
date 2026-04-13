@@ -58,7 +58,6 @@ MiniPy Scanner/
 | LPAREN        | `(`                               |
 | RPAREN        | `)`                               |
 | COLON         | `:`                               |
-| NEWLINE       | end of line                       |
 | EOF           | end of file                       |
 | ERROR         | any unrecognised character        |
 
@@ -186,19 +185,15 @@ Line      Token Type       Lexeme
 Line 1    IDENTIFIER       score
 Line 1    ASSIGN           =
 Line 1    INTEGER          85
-Line 1    NEWLINE          \n
 Line 2    IF               if
 Line 2    IDENTIFIER       score
 Line 2    GREATER_EQUAL    >=
 Line 2    INTEGER          50
 Line 2    COLON            :
-Line 2    NEWLINE          \n
 Line 3    PRINT            print
 Line 3    LPAREN           (
 Line 3    STRING           "Student has passed"
 Line 3    RPAREN           )
-Line 3    NEWLINE          \n
-Line 3    EOF              EOF
 ```
 
 ---
