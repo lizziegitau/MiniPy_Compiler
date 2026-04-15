@@ -169,7 +169,14 @@ static Token scan_identifier_or_keyword()
     // Since the current character is an alphabetic character or an underscore, continue consuming characters as long as they are alphabetic characters, digits or underscores and store them in the lexeme of the token
     while (isalpha(current()) || isdigit(current()) || current() == '_')
     {
-        t.lexeme[i++] = advance();
+        if (i < MAX_LEXEME - 1)
+        {
+            t.lexeme[i++] = advance();
+        }
+        else
+        {
+            advance();
+        }
     }
     t.lexeme[i] = '\0';
 
@@ -388,8 +395,6 @@ static Token next_token()
     while (current() == ' ' || current() == '\t' ||
            current() == '\r' || current() == '\n')
     {
-        if (current() == '\n')
-            line++;
         advance();
     }
 
