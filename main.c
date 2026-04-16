@@ -19,21 +19,21 @@ int main(int argc, char *argv[])
     printf("  Source file: %s\n", filepath);
     printf("============================================================\n\n");
 
-    /* ---- Phase 1 + 2: Scan and parse -------------------------------- */
+    // Phase 1 + 2: Scan and parse
     ParseNode *tree = parse_file(filepath); /* logs tokens internally */
 
-    /* ---- Phase 3: Print parse tree ---------------------------------- */
+    // Phase 3: Print parse tree
     printf("=== PARSE TREE ===\n");
     print_tree(tree, 0);
     printf("\n");
 
-    /* ---- Summary ----------------------------------------------------- */
+    // ---- Summary -----------------------------------------------------
     if (parse_error_count == 0)
         printf("Parse complete: NO syntax errors found.\n");
     else
         printf("Parse complete: %d syntax error(s) found.\n", parse_error_count);
 
-    /* ---- Cleanup ----------------------------------------------------- */
+    // ---- Cleanup -----------------------------------------------------
     free_tree(tree);
     return (parse_error_count == 0) ? 0 : 1;
 }

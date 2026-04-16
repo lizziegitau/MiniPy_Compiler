@@ -1,12 +1,13 @@
-# MiniPy Scanner
+# MiniPy Compiler
 
 ## What is this?
 
-This is a **lexical analyser (scanner)** for **MiniPy** — a mini subset of the Python programming language.
+This is a **MiniPy Compiler front-end** — built from scratch in C — for **MiniPy**, a mini subset of the Python programming language.
 
-The scanner reads a MiniPy source file and breaks it down into tokens — the smallest meaningful units of the language. For each token it prints the line number, token type, and the actual characters matched (the lexeme).
+The compiler currently implements two phases:
 
-The scanner is built **from scratch in C**, directly implementing a Deterministic Finite Automata (DFAs) derived from MiniPy's lexical specification.
+1. **Lexical Analysis (Scanner)** — reads the source file and breaks it into tokens (the smallest meaningful units of the language).
+2. **Syntax Analysis (Parser)** — consumes the token stream and builds a **parse tree** that reflects the grammatical structure of the program.
 
 ---
 
@@ -17,6 +18,9 @@ MiniPy Scanner/
 │
 ├── scanner.h        # Token type definitions (enum + struct)
 ├── scanner.c        # Full scanner implementation
+├── parser.h         # ParseNode struct + public parser API
+├── parser.c         # Recursive-descent parser implementation
+├── main.c           # Entry point: drives scanning, parsing, and output
 ├── sample1.minipy   # Sample MiniPy program 1 (for testing)
 ├── sample2.minipy   # Sample MiniPy program 2 (covers all token types)
 └── README.md        # This file
@@ -131,15 +135,15 @@ gcc --version
    cd "C:\Users\YourName\Desktop\MiniPy Scanner"
    ```
 
-3. Compile the scanner:
+3. Compile all three source files together:
 
    ```
-   gcc scanner.c -o scanner
+   gcc -o minipy main.c scanner.c parser.c
    ```
 
-   This produces an executable file called `scanner.exe` (Windows) or `scanner` (Mac/Linux).
+   This produces an executable called `minipy.exe` (Windows) or `minipy` (Mac/Linux).
 
-   If compilation is successful, you will see no output — just your prompt returning. If you see error messages, check that both `scanner.h` and `scanner.c` are in the same folder.
+   If compilation is successful, you will see no output — just your prompt returning. If you see error messages, check that `scanner.h`, `scanner.c`, `parser.h`, `parser.c`, and `main.c` are all in the same folder.
 
 ---
 
@@ -148,53 +152,82 @@ gcc --version
 ### On Windows
 
 ```
-.\scanner.exe sample1.minipy
+.\minipy.exe sample1.minipy
 ```
 
 or
 
 ```
-scanner.exe sample1.minipy
+minipy.exe sample1.minipy
 ```
 
 ### On Mac / Linux
 
 ```
-./scanner sample1.minipy
+./minipy sample1.minipy
 ```
 
-Replace `sample1.minipy` with any `.minipy` file you want to scan.
+Replace `sample1.minipy` with any `.minipy` file you want to compile.
 
 ---
 
 ## Example Output
 
-Given this MiniPy source code in `sample1.minipy`:
+Given this MiniPy source in `sample1.minipy`:
 
 ```python
 score = 85
 if score >= 50:
     print("Student has passed")
+else:
+    print("Student has failed")
 ```
 
-The scanner produces:
+The compiler produces three sections of output:
+
+### 1. Token Log
 
 ```
-Line      Token Type       Lexeme
----------------------------------------------
-Line 1    IDENTIFIER       score
-Line 1    ASSIGN           =
-Line 1    INTEGER          85
-Line 2    IF               if
-Line 2    IDENTIFIER       score
-Line 2    GREATER_EQUAL    >=
-Line 2    INTEGER          50
-Line 2    COLON            :
-Line 3    PRINT            print
-Line 3    LPAREN           (
-Line 3    STRING           "Student has passed"
-Line 3    RPAREN           )
+=== TOKEN LOG ===
+Line      Token Type                 Lexeme
+--------------------------------------------------
+Line 1    IDENTIFIER                 score
+Line 1    OPERATOR_ASSIGN            =
+Line 1    INTEGER                    85
+Line 2    KEYWORD_IF                 if
+Line 2    IDENTIFIER                 score
+Line 2    OPERATOR_GREATER_EQUAL     >=
+Line 2    INTEGER                    50
+Line 2    PUNCTUATOR_COLON           :
+...
 ```
+
+### 2. Parse Tree
+
+```
+=== PARSE TREE ===
+program
+|-- stmt_list
+|   |-- stmt
+|   |   |-- if_stmt
+|   |   |   |-- KEYWORD_IF("if")
+|   |   |   |-- logical_expr
+|   |   |   |   |-- comparison
+|   |   |   |   |   |-- not_expr
+|   |   |   |   |   |   |-- expr
+|   |   |   |   |   |   |   |-- term
+|   |   |   |   |   |   |   |   |-- factor
+|   |   |   |   |   |   |   |   |   |-- IDENTIFIER("score")
+...
+```
+
+### 3. Summary
+
+```
+Parse complete: NO syntax errors found.
+```
+
+If syntax errors are found, they are reported to `stderr` with the line number and a description, and the summary shows the total error count.
 
 ---
 
@@ -204,15 +237,15 @@ The scanner implements the **DFA (Deterministic Finite Automaton)** derived from
 
 The main components are:
 
-- **`next_token()`** — the master dispatcher. Looks at the current character and routes to the correct DFA function. This corresponds to the master start state `q_start` in the combined DFA.
+- **`next_token()`** — the master dispatcher. Looks at the current character and routes to the correct DFA function.
 
 - **`scan_number()`** — implements the INTEGER and FLOAT DFAs. Uses maximal munch: reads digits, then peeks ahead to check for a decimal point to decide INTEGER vs FLOAT.
 
-- **`scan_identifier_or_keyword()`** — implements the IDENTIFIER and KEYWORD DFAs combined. Reads a full word then checks it against the keyword list. Keywords take priority over identifiers (the priority rule).
+- **`scan_identifier_or_keyword()`** — reads a full word then checks it against the keyword list. Keywords take priority over identifiers (the priority rule).
 
-- **`scan_string()`** — implements the STRING DFA. Reads from opening `"` to closing `"`, handling unterminated strings as ERROR tokens.
+- **`scan_string()`** — reads from opening `"` to closing `"`, handling unterminated strings as ERROR tokens.
 
-- **`scan_operator()`** — implements the OPERATOR DFA. Handles single-character operators directly and uses one-character lookahead (peek) to resolve two-character operators (`==`, `!=`, `<=`, `>=`) via maximal munch.
+- **`scan_operator()`** — handles single-character operators and uses one-character lookahead to resolve two-character operators (`==`, `!=`, `<=`, `>=`) via maximal munch.
 
 ### Scanning Rules Applied
 
@@ -225,6 +258,75 @@ The main components are:
 
 ---
 
+## How the Parser Works
+
+The parser is a **hand-written recursive-descent parser** that implements a predictive LL(1) parsing strategy using a one-token lookahead. It consumes the token stream produced by the scanner and builds a **parse tree** representing the full grammatical structure of the program.
+
+### Grammar
+
+The parser implements the following LL(1) grammar for MiniPy:
+
+```
+program -> stmt_list
+stmt_list -> stmt stmt_list | ε
+stmt -> if_stmt | while_stmt | for_stmt | print_stmt | assign_stmt
+assign_stmt -> IDENTIFIER = logical_expr
+print_stmt -> PRINT ( logical_expr )
+if_stmt -> IF logical_expr : block else_clause
+else_clause -> ELSE : block | ε
+while_stmt -> WHILE logical_expr : block
+for_stmt -> FOR IDENTIFIER IN RANGE ( expr ) : block
+block -> stmt stmt_list
+logical_expr -> comparison logical_prime
+logical_prime -> AND comparison logical_prime | OR comparison logical_prime | ε
+comparison -> not_expr comparison_prime
+comparison_prime -> EQUALS not_expr | NOT_EQUAL not_expr | LESS_THAN not_expr | GREATER_THAN not_expr | LESS_EQUAL not_expr | GREATER_EQUAL not_expr | ε
+not_expr -> NOT not_expr | expr
+expr -> term expr_prime
+expr_prime -> + term expr_prime | - term expr_prime | ε
+term -> factor term_prime
+term_prime -> * factor term_prime | / factor term_prime | ε
+factor -> INTEGER | FLOAT | STRING | IDENTIFIER | TRUE | FALSE | ( logical_expr ) | - factor
+```
+
+The `'` (prime) productions handle left recursion elimination, keeping the grammar suitable for top-down parsing.
+
+### Key Components
+
+- **`parse_file(path)`** — the public entry point. Initialises the scanner, prints the token log, then calls `parse_program()` to build and return the parse tree root.
+
+- **`parse_program()` / `parse_stmt_list()` / `parse_stmt()`** — top-level recursive functions that drive the parse. `parse_stmt_list()` loops while the lookahead is in FIRST(stmt) = `{ IF, WHILE, FOR, PRINT, IDENTIFIER }`.
+
+- **`match(expected)`** — verifies the current token matches the expected type, advances the lookahead, and returns a terminal (leaf) node. On mismatch it records a syntax error and returns an ERROR leaf so the tree remains printable.
+
+- **`peek(type)`** — checks the current lookahead token type without consuming it. Used throughout to make LL(1) branching decisions.
+
+- **`synchronise()`** — panic-mode error recovery. When an unexpected token is encountered, tokens are skipped until a known statement-starting token is found, allowing the parser to continue and report multiple errors in a single run.
+
+### Parse Tree Structure
+
+Each node in the tree is a `ParseNode` with:
+
+| Field         | Description                                                                        |
+| ------------- | ---------------------------------------------------------------------------------- |
+| `label`       | Non-terminal name (e.g. `"if_stmt"`) or token descriptor (e.g. `KEYWORD_IF("if")`) |
+| `is_terminal` | `1` for leaf nodes (tokens), `0` for inner nodes                                   |
+| `children[]`  | Up to 8 child pointers                                                             |
+| `child_count` | Number of active children                                                          |
+
+The tree is printed with `print_tree()` using indented `|--` connectors, and freed recursively with `free_tree()`.
+
+### Error Handling
+
+The parser uses two layers of error handling:
+
+1. **`match()` errors** — when a specific token is expected but not found, an `ERROR(...)` leaf is inserted into the tree and parsing continues from the same position, so the caller can attempt to recover.
+2. **Panic-mode recovery via `synchronise()`** — used at the statement level when a completely unexpected token is encountered. Tokens are discarded until a safe resynchronisation point is reached.
+
+All errors are counted in `parse_error_count` and reported to `stderr` with the offending line number.
+
+---
+
 ## Writing Your Own MiniPy Program
 
 Create a plain text file with a `.minipy` extension and write code using these rules:
@@ -234,6 +336,7 @@ Create a plain text file with a `.minipy` extension and write code using these r
 - Comparisons: `==`, `!=`, `<`, `>`, `<=`, `>=`
 - Logic: `and`, `or`, `not`
 - Control flow: `if`, `else`, `while`, `for ... in range(...)`
-- Output: `print("message")`
+- Output: `print("message")` or `print(variable)`
 - Comments: anything after `#` on a line is ignored
 - Strings must be on a single line enclosed in double quotes `"..."`
+- Blocks are delimited by a colon `:` followed by the body statements (indentation is not enforced by the parser, but is recommended for readability)
