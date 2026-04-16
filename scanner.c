@@ -9,6 +9,14 @@ static char *source = NULL; // String from source code
 static int pos = 0;         // Index of current character
 static int line = 1;        // Current line number
 
+/* Backdoor used by parser.c to (re-)initialise the scanner */
+void scanner_set_source(char *src)
+{
+    source = src;
+    pos = 0;
+    line = 1;
+}
+
 // Function to get the current character without consuming it
 static char current()
 {
@@ -106,23 +114,8 @@ const char *token_type_name(TokenType type)
     }
 }
 
-// Function to print the token name as output
-static void print_token(Token t)
-{
-    printf("Line %-3d  %-15s  %s\n",
-           t.line,
-           token_type_name(t.type),
-           t.lexeme);
-}
-
-static Token scan_number();
-static Token scan_string();
-static Token scan_identifier_or_keyword();
-static Token scan_operator();
-static Token next_token();
-
 // Function to scan digits (handles both integers and floats)
-static Token scan_number()
+static Token scan_number(void)
 {
     Token t;
     t.line = line;
@@ -160,7 +153,7 @@ static Token scan_number()
 }
 
 // Function to scan identifiers and keywords
-static Token scan_identifier_or_keyword()
+static Token scan_identifier_or_keyword(void)
 {
     Token t;
     t.line = line;
@@ -212,7 +205,7 @@ static Token scan_identifier_or_keyword()
 }
 
 // Function to scan strings
-static Token scan_string()
+static Token scan_string(void)
 {
     Token t;
     t.line = line;
@@ -248,7 +241,7 @@ static Token scan_string()
 }
 
 // Function to scan operators and punctuators
-static Token scan_operator()
+static Token scan_operator(void)
 {
     Token t;
     t.line = line;
@@ -264,50 +257,43 @@ static Token scan_operator()
     // Case 1: The current character is an addition operator, set the token type to TOKEN_PLUS and the lexeme to "+"
     case '+':
         t.type = TOKEN_PLUS;
-        t.lexeme[0] = '+';
-        t.lexeme[1] = '\0';
+        strcpy(t.lexeme, "+");
         break;
 
     // Case 2: The current character is a subtraction operator, set the token type to TOKEN_MINUS and the lexeme to "-"
     case '-':
         t.type = TOKEN_MINUS;
-        t.lexeme[0] = '-';
-        t.lexeme[1] = '\0';
+        strcpy(t.lexeme, "-");
         break;
 
     // Case 3: The current character is a multiplication operator, set the token type to TOKEN_MULTIPLY and the lexeme to "*"
     case '*':
         t.type = TOKEN_MULTIPLY;
-        t.lexeme[0] = '*';
-        t.lexeme[1] = '\0';
+        strcpy(t.lexeme, "*");
         break;
 
     // Case 4: The current character is a division operator, set the token type to TOKEN_DIVIDE and the lexeme to "/"
     case '/':
         t.type = TOKEN_DIVIDE;
-        t.lexeme[0] = '/';
-        t.lexeme[1] = '\0';
+        strcpy(t.lexeme, "/");
         break;
 
     // Case 5: The current character is a left parenthesis, set the token type to TOKEN_LPAREN and the lexeme to "("
     case '(':
         t.type = TOKEN_LPAREN;
-        t.lexeme[0] = '(';
-        t.lexeme[1] = '\0';
+        strcpy(t.lexeme, "(");
         break;
 
     // Case 6: The current character is a right parenthesis, set the token type to TOKEN_RPAREN and the lexeme to ")"
     case ')':
         t.type = TOKEN_RPAREN;
-        t.lexeme[0] = ')';
-        t.lexeme[1] = '\0';
+        strcpy(t.lexeme, ")");
         break;
 
     // Case 7: The current character is a colon, set the token type to TOKEN_COLON and the lexeme to ":"
     case ':':
         t.type = TOKEN_COLON;
-        t.lexeme[0] = ':';
-        t.lexeme[1] = '\0';
+        strcpy(t.lexeme, ":");
         break;
 
     // Two-character operators:
@@ -322,8 +308,7 @@ static Token scan_operator()
         else
         {
             t.type = TOKEN_LESS_THAN;
-            t.lexeme[0] = '<';
-            t.lexeme[1] = '\0';
+            strcpy(t.lexeme, "<");
         }
         break;
 
@@ -338,8 +323,7 @@ static Token scan_operator()
         else
         {
             t.type = TOKEN_GREATER_THAN;
-            t.lexeme[0] = '>';
-            t.lexeme[1] = '\0';
+            strcpy(t.lexeme, ">");
         }
         break;
 
@@ -354,8 +338,7 @@ static Token scan_operator()
         else
         {
             t.type = TOKEN_ASSIGN;
-            t.lexeme[0] = '=';
-            t.lexeme[1] = '\0';
+            strcpy(t.lexeme, "=");
         }
         break;
 
@@ -387,13 +370,12 @@ static Token scan_operator()
 }
 
 // Function that dispatches by looking at current character and route it to the appropriate DFA function.
-static Token next_token()
+Token next_token(void)
 {
     Token t;
 
     // Skip whitespace and tab characters and move to next character by calling advance()
-    while (current() == ' ' || current() == '\t' ||
-           current() == '\r' || current() == '\n')
+    while (current() == ' ' || current() == '\t' || current() == '\r' || current() == '\n')
     {
         advance();
     }
@@ -439,12 +421,9 @@ static Token next_token()
     }
 
     // Handles when an operator or a punctuator is scanned by calling scan_operator() which will handle both operators and punctuators
-    if (current() == '+' || current() == '-' ||
-        current() == '*' || current() == '/' ||
-        current() == '=' || current() == '!' ||
-        current() == '<' || current() == '>' ||
-        current() == '(' || current() == ')' ||
-        current() == ':')
+    if (current() == '+' || current() == '-' || current() == '*' || current() == '/' ||
+        current() == '=' || current() == '!' || current() == '<' || current() == '>' ||
+        current() == '(' || current() == ')' || current() == ':')
     {
         return scan_operator();
     }
@@ -455,60 +434,4 @@ static Token next_token()
     t.lexeme[1] = '\0';
     advance();
     return t;
-}
-
-// Main function
-int main(int argc, char *argv[])
-{
-
-    // Ensure a file name is provided
-    if (argc < 2)
-    {
-        printf("Usage: scanner <filename>\n");
-        return 1;
-    }
-
-    // Open the provided source file in binary mode
-    FILE *f = fopen(argv[1], "rb");
-    if (!f)
-    {
-        printf("Error: cannot open file '%s'\n", argv[1]);
-        return 1;
-    }
-
-    // Find the size of the provided file
-    fseek(f, 0, SEEK_END);
-    long size = ftell(f);
-    fseek(f, 0, SEEK_SET);
-
-    // Allocate memory to hold the whole file and null terminator (+1)
-    source = (char *)malloc(size + 1);
-    if (!source)
-    {
-        printf("Error: out of memory\n");
-        return 1;
-    }
-
-    // Read the file into source
-    fread(source, 1, size, f);
-    source[size] = '\0';
-    fclose(f);
-
-    // Loop function for scanning the source code and printing the line number, token type and the lexeme
-    printf("%-8s  %-15s  %s\n", "Line", "Token Type", "Lexeme");
-    printf("---------------------------------------------\n");
-
-    Token t;
-    do
-    {
-        t = next_token();
-        // Only print real tokens — EOF is internal only
-        if (t.type != TOKEN_EOF)
-        {
-            print_token(t);
-        }
-    } while (t.type != TOKEN_EOF);
-
-    free(source);
-    return 0;
 }
