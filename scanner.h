@@ -52,14 +52,18 @@ typedef enum
     // Special tokens
     TOKEN_EOF,
     TOKEN_ERROR
-} TokenType;
+} MiniTokenType;
 
 // Token struct
 typedef struct
 {
-    TokenType type;          // Token type
+    MiniTokenType type;      // Token type
     char lexeme[MAX_LEXEME]; // Actual lexeme from source code
     int line;                // Line of the source code that said lexeme is from
 } Token;
+
+// Function declarations
+const char *token_type_name(MiniTokenType type);
+void scanner_set_source(char *src);
 
 #endif

@@ -3,8 +3,8 @@
 
 #include "scanner.h"
 
-// Parse Tree node structure.  Each node has a label (non-terminal name or token lexeme) and a flag indicating if it's a terminal (leaf) or non-terminal (inner node).  Each node can have up to MAX_CHILDREN (8) children.
-#define MAX_CHILDREN 8
+// Parse Tree node structure.  Each node has a label (non-terminal name or token lexeme) and a flag indicating if it's a terminal (leaf) or non-terminal (inner node).  Each node can have up to MAX_CHILDREN (12) children.
+#define MAX_CHILDREN 12
 #define MAX_LABEL 128
 
 typedef struct ParseNode

@@ -4,25 +4,9 @@
 score = 85
 passing_score = 50
 bonus = 1.5
- 
 total = score + bonus * 2
-average = total / 2
-difference = score - passing_score
  
-if total > passing_score:
+if total > passing_score
 	print("Student has passed")
 else:
 	print("Student has failed")
- 
-count = 0
-while count < 3:
-	count = count + 1
-	print(count)
- 
-for i in range(5):
-	result = i * 2
-	print(result)
- 
-is_eligible = total > 80 and count == 3
-if is_eligible:
-	print("Eligible for honours")

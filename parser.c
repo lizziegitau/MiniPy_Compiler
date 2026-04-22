@@ -5,10 +5,6 @@
 #include "scanner.h"
 #include "parser.h"
 
-// Forward declaration from scanner.c
-const char *token_type_name(TokenType type);
-void scanner_set_source(char *src);
-
 // Scanner interface, it re-uses the public next_token() from scanner.c
 extern Token next_token(void);
 
@@ -16,6 +12,9 @@ extern Token next_token(void);
 int parse_error_count = 0;
 
 static Token current_token; // The one-token lookahead buffer
+
+// A single global buffer is used for the source code, which is loaded by scanner_init() and freed at the end of parse_file()
+static char *_src_buf = NULL;
 
 // Parse-node helpers
 //  Creates the parent node with the given label and terminal status and returns a pointer to it.
@@ -43,7 +42,7 @@ static void add_child(ParseNode *parent, ParseNode *child)
 
 // Lookahead helpers
 // peek() checks if the current token is of the specified type without consuming it.
-static int peek(TokenType t) { return current_token.type == t; }
+static int peek(MiniTokenType t) { return current_token.type == t; }
 
 // advance() consumes the current token and loads the next one into the lookahead buffer, returning the consumed token
 static Token advance_token(void)
@@ -54,7 +53,7 @@ static Token advance_token(void)
 }
 
 // match() verifies the current token is of the expected type, advances and returns a leaf node.  On mismatch it emits an error and returns an ERROR leaf so the tree remains as complete as possible
-static ParseNode *match(TokenType expected)
+static ParseNode *match(MiniTokenType expected)
 {
     if (current_token.type == expected)
     {
@@ -101,6 +100,7 @@ static void synchronise(void)
 static ParseNode *parse_stmt_list(void);
 static ParseNode *parse_stmt(void);
 static ParseNode *parse_if_stmt(void);
+static ParseNode *parse_else_clause(void);
 static ParseNode *parse_while_stmt(void);
 static ParseNode *parse_for_stmt(void);
 static ParseNode *parse_print_stmt(void);
@@ -122,7 +122,9 @@ static ParseNode *parse_program(void)
 {
     ParseNode *node = make_node("program", 0);
     add_child(node, parse_stmt_list());
-    add_child(node, match(TOKEN_EOF));
+
+    ParseNode *eof_node = match(TOKEN_EOF);
+    free_tree(eof_node);
     return node;
 }
 
@@ -176,16 +178,22 @@ static ParseNode *parse_if_stmt(void)
     add_child(node, parse_logical_expr());
     add_child(node, match(TOKEN_COLON));
     add_child(node, parse_block());
+    add_child(node, parse_else_clause());
+    return node;
+}
 
-    // A dangling else is resolved by greedy match
+// else_clause -> ELSE : block | ε
+static ParseNode *parse_else_clause(void)
+{
+    ParseNode *node = make_node("else_clause", 0);
+
     if (peek(TOKEN_ELSE))
     {
-        ParseNode *else_node = make_node("else_clause", 0);
-        add_child(else_node, match(TOKEN_ELSE));
-        add_child(else_node, match(TOKEN_COLON));
-        add_child(else_node, parse_block());
-        add_child(node, else_node);
+        add_child(node, match(TOKEN_ELSE));
+        add_child(node, match(TOKEN_COLON));
+        add_child(node, parse_block());
     }
+    // ε case — return empty node
     return node;
 }
 
@@ -454,17 +462,15 @@ void scanner_init(const char *path);
 
 ParseNode *parse_file(const char *path)
 {
+    // First init for token log
     scanner_init(path);
-
     parse_error_count = 0;
-    current_token = next_token();
 
     printf("=== TOKEN LOG ===\n");
     printf("%-8s  %-25s  %s\n", "Line", "Token Type", "Lexeme");
     printf("--------------------------------------------------\n");
 
-    scanner_init(path);
-
+    // Collect tokens for the log
     int cap = 256;
     int count = 0;
     Token *toks = (Token *)malloc(cap * sizeof(Token));
@@ -496,18 +502,24 @@ ParseNode *parse_file(const char *path)
     }
     printf("\n");
 
+    // Second init for actual parsing
     scanner_init(path);
     parse_error_count = 0;
     current_token = next_token();
 
     ParseNode *root = parse_program();
 
+    // Free the source buffer now that parsing is complete
     free(toks);
+
+    if (_src_buf)
+    {
+        free(_src_buf);
+        _src_buf = NULL;
+    }
+
     return root;
 }
-
-// A single global buffer is used for the source code, which is loaded by scanner_init() and freed at the end of parse_file()
-static char *_src_buf = NULL;
 
 // It loads the entire source file into memory and sets up the scanner's internal state to point to this buffer
 void scanner_init(const char *path)

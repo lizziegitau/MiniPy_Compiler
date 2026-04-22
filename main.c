@@ -15,7 +15,7 @@ int main(int argc, char *argv[])
     const char *filepath = argv[1];
 
     printf("============================================================\n");
-    printf("  MiniPy Compiler  —  Group 8\n");
+    printf("  MiniPy Compiler  Group 8\n");
     printf("  Source file: %s\n", filepath);
     printf("============================================================\n\n");
 
@@ -27,13 +27,12 @@ int main(int argc, char *argv[])
     print_tree(tree, 0);
     printf("\n");
 
-    // ---- Summary -----------------------------------------------------
     if (parse_error_count == 0)
         printf("Parse complete: NO syntax errors found.\n");
     else
         printf("Parse complete: %d syntax error(s) found.\n", parse_error_count);
 
-    // ---- Cleanup -----------------------------------------------------
+    // Cleanup
     free_tree(tree);
     return (parse_error_count == 0) ? 0 : 1;
 }

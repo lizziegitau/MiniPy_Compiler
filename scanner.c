@@ -41,7 +41,7 @@ static char advance()
 }
 
 // Function to get the name of the token type as a string for output
-const char *token_type_name(TokenType type)
+const char *token_type_name(MiniTokenType type)
 {
     switch (type)
     {
