@@ -6,7 +6,7 @@ passing_score = 50
 bonus = 1.5
 total = score + bonus * 2
  
-if total > passing_score
+if total > passing_score:
 	print("Student has passed")
 else:
 	print("Student has failed")
