@@ -15,7 +15,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    /* Get the source file path */
+    /* Get the source file path which is the .minipy file passed by the user */
     const char *filepath = argv[1];
 
     /* Print compiler information */
@@ -24,10 +24,10 @@ int main(int argc, char *argv[])
     printf("  Source file: %s\n", filepath);
     printf("============================================================\n\n");
 
-    /* Phase 1: Scanning and Parsing */
+    /* Run Phase 1: Scanning and Phase 2: Parsing in sequence */
     ParseNode *tree = parse_file(filepath);
 
-    /* Phase 2: Print the parse tree */
+    /* Print the parse tree generated in Phase 2 */
     printf("=== PARSE TREE ===\n");
     print_tree(tree, 0);
     printf("\n");
@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
     /* Phase 3: Intermediate Code Generation by calling icg_generate that walks the parse tree and prints TAC */
     icg_generate(tree);
 
-    /* Cleanup and exit */
+    /* Free allocated memory and exit */
     free_tree(tree);
     return 0;
 }

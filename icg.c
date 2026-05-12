@@ -50,7 +50,7 @@ static void emit_label(const char *lbl)
     emit("LABEL", "", "", lbl);
 }
 
-/* Function that emits an unconditional jump if the condition is true */
+/* Function that emits an unconditional jump to skip over an else block after a then */
 static void emit_goto(const char *lbl)
 {
     emit("GOTO", "", "", lbl);
@@ -578,73 +578,76 @@ static void icg_print_stmt(ParseNode *node)
 /* Function to print the generated intermediate code */
 void icg_print(void)
 {
-    printf("=== INTERMEDIATE CODE (Three-Address Code) ===\n");
-    printf("%-5s  %-16s  %-20s  %-20s  %s\n",
-           "Line", "Operation", "Arg1", "Arg2", "Result");
-    printf("----------------------------------------------------------------------\n");
+/* Column widths */
+#define W_NO 4
+#define W_OP 14
+#define W_RES 16
+#define W_ARG1 16
+#define W_ARG2 16
 
-    /* Loop through all generated quadruples */
+    /* Separator */
+    const char *SEP =
+        "----------------------------------------------------------------"
+        "---"; /* 67 chars */
+
+    printf("\nINTERMEDIATE CODE GENERATED (QUADRUPLES):\n");
+    printf("%-*s  %-*s  %-*s  %-*s  %-*s\n",
+           W_NO, "No.",
+           W_OP, "OP",
+           W_RES, "RESULT",
+           W_ARG1, "ARG1",
+           W_ARG2, "ARG2");
+    printf("%s\n", SEP);
+
     for (int i = 0; i < quad_count; i++)
     {
         Quad *q = &quads[i];
 
-        /* Special pretty-print for label definitions */
-        if (strcmp(q->op, "LABEL") == 0)
-        {
-            printf("[%03d]  %s:\n", i, q->result);
-            continue;
-        }
+        /* Normalise empty strings to "-" for display */
+        const char *op = (q->op[0]) ? q->op : "-";
+        const char *res = (q->result[0]) ? q->result : "-";
+        const char *arg1 = (q->arg1[0]) ? q->arg1 : "-";
+        const char *arg2 = (q->arg2[0]) ? q->arg2 : "-";
 
-        /* Special pretty-print for unconditional goto */
-        if (strcmp(q->op, "GOTO") == 0)
-        {
-            printf("[%03d]  %-16s  goto %s\n", i, "", q->result);
-            continue;
-        }
-
-        /* Special pretty-print for conditional jump */
+        /* Rename ops to the short display names used in the reference table */
+        char op_disp[MAX_OP];
         if (strcmp(q->op, "IF_FALSE_GOTO") == 0)
-        {
-            printf("[%03d]  if NOT %-13s  goto %s\n", i, q->arg1, q->result);
-            continue;
-        }
-        if (strcmp(q->op, "IF_TRUE_GOTO") == 0)
-        {
-            printf("[%03d]  if %-16s  goto %s\n", i, q->arg1, q->result);
-            continue;
-        }
-
-        /* Special pretty-print for PRINT */
-        if (strcmp(q->op, "PRINT") == 0)
-        {
-            printf("[%03d]  print %s\n", i, q->arg1);
-            continue;
-        }
-
-        /* Special pretty-print for ASSIGN */
-        if (strcmp(q->op, "ASSIGN") == 0)
-        {
-            printf("[%03d]  %-20s  =  %s\n", i, q->result, q->arg1);
-            continue;
-        }
-
-        /* General binary / unary instruction */
-        if (q->arg2[0] != '\0')
-        {
-            /* binary: result = arg1 OP arg2 */
-            printf("[%03d]  %-20s  =  %s  %s  %s\n",
-                   i, q->result, q->arg1, q->op, q->arg2);
-        }
+            strcpy(op_disp, "IF_FALSE");
+        else if (strcmp(q->op, "IF_TRUE_GOTO") == 0)
+            strcpy(op_disp, "IF_TRUE");
         else
+            strncpy(op_disp, op, MAX_OP - 1);
+        op_disp[MAX_OP - 1] = '\0';
+
+        /* For IF_FALSE / IF_TRUE the jump target lives in resultand arg1 holds the condition variable, swap for display so the table reads:  IF_FALSE  <label>  <cond>  - */
+        const char *disp_res = res;
+        const char *disp_arg1 = arg1;
+        const char *disp_arg2 = arg2;
+
+        if (strcmp(q->op, "IF_FALSE_GOTO") == 0 ||
+            strcmp(q->op, "IF_TRUE_GOTO") == 0)
         {
-            /* unary: result = OP arg1 */
-            printf("[%03d]  %-20s  =  %s %s\n",
-                   i, q->result, q->op, q->arg1);
+            disp_res = (q->result[0]) ? q->result : "-"; /* label  */
+            disp_arg1 = (q->arg1[0]) ? q->arg1 : "-";    /* cond   */
+            disp_arg2 = "-";
         }
+
+        printf("%*d  %-*s  %-*s  %-*s  %-*s\n",
+               W_NO, i + 1, /* 1-based numbering */
+               W_OP, op_disp,
+               W_RES, disp_res,
+               W_ARG1, disp_arg1,
+               W_ARG2, disp_arg2);
     }
 
-    printf("----------------------------------------------------------------------\n");
+    printf("%s\n", SEP);
     printf("Total instructions: %d\n\n", quad_count);
+
+#undef W_NO
+#undef W_OP
+#undef W_RES
+#undef W_ARG1
+#undef W_ARG2
 }
 
 /* Function to handle statement nodes */
