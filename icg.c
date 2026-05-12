@@ -1,16 +1,3 @@
-/*  icg.c  —  MiniPy Intermediate Code Generator (Phase 3)
- *
- *  Strategy: recursive tree-walk over the ParseNode tree produced by the
- *  parser.  Each icg_*() function matches on node->label and emits the
- *  corresponding Three-Address Code (TAC) quadruples.
- *
- *  Members:
- *    WP-01  Expressions          → icg_factor / icg_term / icg_expr        (Hodhan)
- *    WP-02  Comparisons & Logic  → icg_comparison / icg_logical_expr       (Salma)
- *    WP-03  Control Flow         → icg_if / icg_while / icg_for            (Elizabeth)
- *    WP-04  Assign, Print, Output→ icg_assign / icg_print / icg_print_quads (Iman)
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,73 +5,64 @@
 #include "icg.h"
 #include "parser.h"
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   §0  GLOBAL STATE
-   ═══════════════════════════════════════════════════════════════════════════ */
-
+/* Global array to store the generated quadruples and their count */
 Quad quads[MAX_QUADS];
 int quad_count = 0;
 
-static int temp_count = 0;  /* next temporary index:  t0, t1, t2, …  */
-static int label_count = 0; /* next label index:      L0, L1, L2, …  */
+static int temp_count = 0;  /* index for generating temporary variables */
+static int label_count = 0; /* index for generating unique labels */
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   §1  HELPERS  (shared by all four modules)
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-/* Allocate a fresh temporary name like "t3" into `buf` (caller supplies).  */
+/* Function that generates a new temporary variable name and stores it in `buf` */
 static void new_temp(char *buf, int bufsz)
 {
     snprintf(buf, bufsz, "t%d", temp_count++);
 }
 
-/* Allocate a fresh label name like "L5" into `buf`.                        */
+/* Function that generates a new label name and stores it in `buf` */
 static void new_label(char *buf, int bufsz)
 {
     snprintf(buf, bufsz, "L%d", label_count++);
 }
 
-/* Append one quadruple to the global array.                                */
+/* Function that appends one quadruple to the global array */
 static void emit(const char *op,
                  const char *arg1,
                  const char *arg2,
                  const char *result)
 {
+    /* Check if we have space for another quadruple in the buffer */
     if (quad_count >= MAX_QUADS)
     {
         fprintf(stderr, "ICG Error: quad buffer overflow\n");
         return;
     }
+    /* Append the quadruple to the array if we have space in the buffer */
     Quad *q = &quads[quad_count++];
-    strncpy(q->op, op ? op : "", MAX_OP - 1);
-    strncpy(q->arg1, arg1 ? arg1 : "", MAX_OPERAND - 1);
-    strncpy(q->arg2, arg2 ? arg2 : "", MAX_OPERAND - 1);
-    strncpy(q->result, result ? result : "", MAX_OPERAND - 1);
+    strncpy(q->op, op ? op : "", MAX_OP - 1);                  /* Append operator */
+    strncpy(q->arg1, arg1 ? arg1 : "", MAX_OPERAND - 1);       /* Append left operand */
+    strncpy(q->arg2, arg2 ? arg2 : "", MAX_OPERAND - 1);       /* Append right operand */
+    strncpy(q->result, result ? result : "", MAX_OPERAND - 1); /* Append result */
 }
 
-/* ── label node helpers ──────────────────────────────────────────────────── */
-
-/* Emit a label definition:  LABEL  ""  ""  L3                              */
+/* Function that emits a label definition */
 static void emit_label(const char *lbl)
 {
     emit("LABEL", "", "", lbl);
 }
 
-/* Emit an unconditional jump:  GOTO  ""  ""  L3                            */
+/* Function that emits an unconditional jump if the condition is true */
 static void emit_goto(const char *lbl)
 {
     emit("GOTO", "", "", lbl);
 }
 
-/* Emit a conditional jump:  IF_FALSE_GOTO  cond  ""  L3                   */
+/* Function that emits a conditional jump if the condition is false */
 static void emit_if_false(const char *cond, const char *lbl)
 {
     emit("IF_FALSE_GOTO", cond, "", lbl);
 }
 
-/* ── child accessor ──────────────────────────────────────────────────────── */
-
-/* Return the i-th child of node, or NULL if out of range.                  */
+/* Function that returns the i-th child of a parse node, or NULL if out of range */
 static ParseNode *child(ParseNode *node, int i)
 {
     if (!node || i < 0 || i >= node->child_count)
@@ -92,7 +70,7 @@ static ParseNode *child(ParseNode *node, int i)
     return node->children[i];
 }
 
-/* Return 1 if node->label starts with `prefix`.                            */
+/* Function that checks if a node's label starts with a given prefix */
 static int label_is(ParseNode *node, const char *prefix)
 {
     if (!node)
@@ -100,10 +78,7 @@ static int label_is(ParseNode *node, const char *prefix)
     return strncmp(node->label, prefix, strlen(prefix)) == 0;
 }
 
-/* Extract the raw lexeme from a terminal node whose label looks like:
-   KEYWORD_IF("if")  →  returns "if"
-   INTEGER("85")     →  returns "85"
-   IDENTIFIER("x")  →  returns "x"                                         */
+/* Function that extracts the lexeme from a terminal node by removing the surrounding quotes and null-terminating it to the buffer so that it can be used as an operand */
 static void extract_lexeme(ParseNode *node, char *buf, int bufsz)
 {
     buf[0] = '\0';
@@ -123,57 +98,57 @@ static void extract_lexeme(ParseNode *node, char *buf, int bufsz)
     buf[len] = '\0';
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   §2  FORWARD DECLARATIONS
-   ═══════════════════════════════════════════════════════════════════════════ */
-
+/* Function declarations for ICG functions */
+/* Function to handle stmt_list */
 static void icg_stmt_list(ParseNode *node);
+/* Function to handle stmt */
 static void icg_stmt(ParseNode *node);
+/* Function to handle assignment statements */
 static void icg_assign_stmt(ParseNode *node);
+/* Function to handle print statements */
 static void icg_print_stmt(ParseNode *node);
+/* Function to handle if statements */
 static void icg_if_stmt(ParseNode *node);
+/* Function to handle while statements */
 static void icg_while_stmt(ParseNode *node);
+/* Function to handle for statements */
 static void icg_for_stmt(ParseNode *node);
+/* Function to handle the body of if, for and while statements */
 static void icg_block(ParseNode *node);
-
+/* Function to handle logical expressions */
 static void icg_logical_expr(ParseNode *node, char *out, int outsz);
+/* Function to handle the right-recursive tail of logical expressions */
 static void icg_logical_expr_prime(ParseNode *node, char *lhs, int lhssz);
+/* Function to handle comparison expressions */
 static void icg_comparison(ParseNode *node, char *out, int outsz);
+/* Function to handle the right-recursive tail of comparison expressions */
 static void icg_comparison_prime(ParseNode *node, char *lhs, int lhssz);
+/* Function to handle not expressions */
 static void icg_not_expr(ParseNode *node, char *out, int outsz);
+/* Function to handle expressions */
 static void icg_expr(ParseNode *node, char *out, int outsz);
+/* Function to handle the right-recursive tail of expressions */
 static void icg_expr_prime(ParseNode *node, char *lhs, int lhssz);
+/* Function to handle term */
 static void icg_term(ParseNode *node, char *out, int outsz);
+/* Function to handle the right-recursive tail of term */
 static void icg_term_prime(ParseNode *node, char *lhs, int lhssz);
+/* Function to handle factor */
 static void icg_factor(ParseNode *node, char *out, int outsz);
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   §3  WP-01  EXPRESSION TAC  (Hodhan)
-   ───────────────────────────────────────────────────────────────────────────
-   Grammar rules handled:
-     expr       → term expr'
-     expr'      → + term expr'  |  - term expr'  |  ε
-     term       → factor term'
-     term'      → * factor term'  |  / factor term'  |  ε
-     factor     → INTEGER | FLOAT | STRING | IDENTIFIER | TRUE | FALSE
-                | ( logical_expr )  |  - factor
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-/*  icg_factor: leaf-level.  Returns the operand name in `out`.
-    Literals and identifiers are returned as-is (no code emitted).
-    Unary minus emits:  NEG  arg  ""  tN                                    */
+/* Function to handle factor */
 static void icg_factor(ParseNode *node, char *out, int outsz)
 {
     out[0] = '\0';
     if (!node)
         return;
 
-    /* factor has exactly one child (the matched terminal or a sub-expr).   */
+    /* Handle the first child */
     ParseNode *c0 = child(node, 0);
     if (!c0)
         return;
 
-    /* ── unary minus: children are OPERATOR_MINUS and factor ────────────── */
+    /* If the first child is a unary minus operator, create a new temporary and emit a NEG instruction */
     if (label_is(c0, "OPERATOR_MINUS"))
     {
         char inner[MAX_OPERAND];
@@ -183,172 +158,184 @@ static void icg_factor(ParseNode *node, char *out, int outsz)
         return;
     }
 
-    /* ── parenthesised expression: children are '(' logical_expr ')' ────── */
+    /* If the first child is a left parenthesis, handle the parenthesised expression */
     if (label_is(c0, "PUNCTUATOR_LPAREN"))
     {
         icg_logical_expr(child(node, 1), out, outsz);
         return;
     }
 
-    /* ── literal or identifier terminal: just extract the lexeme ─────────── */
+    /* If the first child is a literal or identifier, extract the lexeme */
     extract_lexeme(c0, out, outsz);
 }
 
-/*  icg_term_prime: handles the right-recursive tail  * factor term'  etc.
-    `lhs` is the accumulated result so far; updated in-place.               */
+/* Function to handle the right-recursive tail of term */
 static void icg_term_prime(ParseNode *node, char *lhs, int lhssz)
 {
+    /* Handles an epsilon production */
     if (!node || node->child_count == 0)
-        return; /* ε production */
+        return;
 
-    /* children: [0] operator  [1] factor  [2] term'                        */
+    /* Handle the operator, factor and recursive tail */
     ParseNode *op_node = child(node, 0);
     ParseNode *factor_node = child(node, 1);
     ParseNode *rest_node = child(node, 2);
 
+    /* Extract the operator lexeme and right-hand side */
     char op_str[16];
     extract_lexeme(op_node, op_str, sizeof(op_str));
     char rhs[MAX_OPERAND];
     icg_factor(factor_node, rhs, sizeof(rhs));
 
+    /* Create a new temporary for the result */
     char temp[MAX_OPERAND];
     new_temp(temp, sizeof(temp));
 
+    /* Emit the appropriate TAC instruction, either MUL or DIV */
     if (strcmp(op_str, "*") == 0)
         emit("MUL", lhs, rhs, temp);
     else
         emit("DIV", lhs, rhs, temp);
 
+    /* Update the left-hand side with the result */
     strncpy(lhs, temp, lhssz - 1);
     icg_term_prime(rest_node, lhs, lhssz);
 }
 
-/*  icg_term: term → factor term'                                           */
+/* Function to handle term */
 static void icg_term(ParseNode *node, char *out, int outsz)
 {
+    /* Initialize the output string */
     out[0] = '\0';
     if (!node)
         return;
 
+    /* Handle the first child and copy its value to the output */
     char lhs[MAX_OPERAND];
     icg_factor(child(node, 0), lhs, sizeof(lhs));
     icg_term_prime(child(node, 1), lhs, sizeof(lhs));
     strncpy(out, lhs, outsz - 1);
 }
 
-/*  icg_expr_prime: handles the right-recursive tail  + term expr'  etc.   */
+/* Function to handle the right-recursive tail of expression */
 static void icg_expr_prime(ParseNode *node, char *lhs, int lhssz)
 {
+    /* Handles an epsilon production */
     if (!node || node->child_count == 0)
         return; /* ε */
 
+    /* Handle the operator, term and recursive tail */
     ParseNode *op_node = child(node, 0);
     ParseNode *term_node = child(node, 1);
     ParseNode *rest_node = child(node, 2);
 
+    /* Extract the operator lexeme and right-hand side */
     char op_str[16];
     extract_lexeme(op_node, op_str, sizeof(op_str));
     char rhs[MAX_OPERAND];
     icg_term(term_node, rhs, sizeof(rhs));
 
+    /* Create a new temporary for the result */
     char temp[MAX_OPERAND];
     new_temp(temp, sizeof(temp));
 
+    /* Emit the appropriate TAC instruction, either ADD or SUB */
     if (strcmp(op_str, "+") == 0)
         emit("ADD", lhs, rhs, temp);
     else
         emit("SUB", lhs, rhs, temp);
 
+    /* Update the left-hand side with the result */
     strncpy(lhs, temp, lhssz - 1);
     icg_expr_prime(rest_node, lhs, lhssz);
 }
 
-/*  icg_expr: expr → term expr'                                             */
+/* Function to handle expression */
 static void icg_expr(ParseNode *node, char *out, int outsz)
 {
+    /* Initialize the output string */
     out[0] = '\0';
     if (!node)
         return;
 
+    /* Handle the first child and copy its value to the output */
     char lhs[MAX_OPERAND];
     icg_term(child(node, 0), lhs, sizeof(lhs));
     icg_expr_prime(child(node, 1), lhs, sizeof(lhs));
     strncpy(out, lhs, outsz - 1);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   §4  WP-02  COMPARISON & LOGICAL TAC  (Salma)
-   ───────────────────────────────────────────────────────────────────────────
-   Grammar rules handled:
-     logical_expr  → comparison logical_expr'
-     logical_expr' → AND comparison logical_expr'
-                   | OR  comparison logical_expr'  |  ε
-     comparison    → not_expr comparison'
-     comparison'   → (== | != | < | > | <= | >=) not_expr  |  ε
-     not_expr      → NOT not_expr  |  expr
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-/*  Map a MiniPy comparison lexeme to a TAC operator string.               */
+/*  Map a MiniPy comparison lexeme to a TAC operator string */
 static const char *cmp_op(const char *lexeme)
 {
+    /* For when the lexeme matches an equals to operator */
     if (strcmp(lexeme, "==") == 0)
         return "EQ";
+    /* For when the lexeme matches a not-equals operator */
     if (strcmp(lexeme, "!=") == 0)
         return "NEQ";
+    /* For when the lexeme matches a less-than operator */
     if (strcmp(lexeme, "<") == 0)
         return "LT";
+    /* For when the lexeme matches a greater-than operator */
     if (strcmp(lexeme, ">") == 0)
         return "GT";
+    /* For when the lexeme matches a less-than-or-equals operator */
     if (strcmp(lexeme, "<=") == 0)
         return "LEQ";
+    /* For when the lexeme matches a greater-than-or-equals operator */
     if (strcmp(lexeme, ">=") == 0)
         return "GEQ";
+    /* Default case */
     return "CMP";
 }
 
-/*  icg_comparison_prime: (op not_expr comparison') | ε
-    Updates `lhs` with the comparison result.                               */
+/* Function to handle the right-recursive tail of comparison */
 static void icg_comparison_prime(ParseNode *node, char *lhs, int lhssz)
 {
+    /* Handles an epsilon production */
     if (!node || node->child_count == 0)
         return; /* ε */
 
-    /* children: [0] operator  [1] not_expr  [2] comparison'               */
+    /* Extract the operator and right-hand side */
     char op_str[16];
     extract_lexeme(child(node, 0), op_str, sizeof(op_str));
     char rhs[MAX_OPERAND];
     icg_not_expr(child(node, 1), rhs, sizeof(rhs));
 
+    /* Create a new temporary for the result */
     char temp[MAX_OPERAND];
     new_temp(temp, sizeof(temp));
     emit(cmp_op(op_str), lhs, rhs, temp);
 
+    /* Update the left-hand side with the result */
     strncpy(lhs, temp, lhssz - 1);
     icg_comparison_prime(child(node, 2), lhs, lhssz);
 }
 
-/*  icg_comparison: comparison → not_expr comparison'                      */
+/* Function to handle comparison expressions */
 static void icg_comparison(ParseNode *node, char *out, int outsz)
 {
+    /* Initialize the output string */
     out[0] = '\0';
     if (!node)
         return;
 
+    /* Handle the first child and copy its value to the output */
     char lhs[MAX_OPERAND];
     icg_not_expr(child(node, 0), lhs, sizeof(lhs));
     icg_comparison_prime(child(node, 1), lhs, sizeof(lhs));
     strncpy(out, lhs, outsz - 1);
 }
 
-/*  icg_logical_expr_prime: short-circuit AND / OR.
-    AND semantics:  if lhs is false, skip rhs  → result is false
-    OR  semantics:  if lhs is true,  skip rhs  → result is true           */
+/* Function to handle the right-recursive tail of logical expressions */
 static void icg_logical_expr_prime(ParseNode *node, char *lhs, int lhssz)
 {
+    /* Handles an epsilon production */
     if (!node || node->child_count == 0)
         return; /* ε */
 
-    /* children: [0] AND/OR keyword  [1] comparison  [2] logical_expr'     */
+    /* Extract the logical operator and right-hand side */
     char kw[16];
     extract_lexeme(child(node, 0), kw, sizeof(kw));
     char rhs[MAX_OPERAND];
@@ -357,14 +344,10 @@ static void icg_logical_expr_prime(ParseNode *node, char *lhs, int lhssz)
     new_label(skip, sizeof(skip));
     new_temp(temp, sizeof(temp));
 
+    /* If the operator is "and",  */
     if (strcmp(kw, "and") == 0)
     {
-        /* Short-circuit AND:
-             IF_FALSE_GOTO lhs → skip
-             rhs = eval(comparison)
-             temp = lhs AND rhs
-           skip:
-             temp = lhs  (already false)                                    */
+        /* If lhs is false, skip evaluation of rhs */
         emit_if_false(lhs, skip);
         icg_comparison(child(node, 1), rhs, sizeof(rhs));
         emit("AND", lhs, rhs, temp);
@@ -377,9 +360,7 @@ static void icg_logical_expr_prime(ParseNode *node, char *lhs, int lhssz)
     }
     else
     {
-        /* Short-circuit OR:
-             if lhs is already true → skip evaluation of rhs
-             temp = lhs OR rhs                                              */
+        /* If the operator is "or", jump to done if lhs is true */
         char true_lbl[MAX_OPERAND];
         new_label(true_lbl, sizeof(true_lbl));
         /* if lhs is true, jump to done with lhs as result */
@@ -394,36 +375,41 @@ static void icg_logical_expr_prime(ParseNode *node, char *lhs, int lhssz)
         emit_label(done);
     }
 
+    /* Update the left-hand side with the result */
     strncpy(lhs, temp, lhssz - 1);
     icg_logical_expr_prime(child(node, 2), lhs, lhssz);
 }
 
-/*  icg_logical_expr: logical_expr → comparison logical_expr'             */
+/* Function to handle logical expressions */
 static void icg_logical_expr(ParseNode *node, char *out, int outsz)
 {
     out[0] = '\0';
     if (!node)
         return;
 
+    /* Evaluate the first comparison and copy its value to the output */
     char lhs[MAX_OPERAND];
     icg_comparison(child(node, 0), lhs, sizeof(lhs));
     icg_logical_expr_prime(child(node, 1), lhs, sizeof(lhs));
     strncpy(out, lhs, outsz - 1);
 }
 
-/*  icg_not_expr: NOT not_expr  |  expr                                    */
+/* Function to handle not expressions */
 static void icg_not_expr(ParseNode *node, char *out, int outsz)
 {
     out[0] = '\0';
     if (!node)
         return;
 
+    /* Evaluate the first child and copy its value to the output */
     ParseNode *c0 = child(node, 0);
     if (!c0)
         return;
 
+    /* If the node is a NOT keyword */
     if (label_is(c0, "KEYWORD_NOT"))
     {
+        /* Evaluate the nested expression and apply the NOT operation */
         char inner[MAX_OPERAND];
         icg_not_expr(child(node, 1), inner, sizeof(inner));
         new_temp(out, outsz);
@@ -431,27 +417,21 @@ static void icg_not_expr(ParseNode *node, char *out, int outsz)
     }
     else
     {
+        /* Evaluate the first child and copy its value to the output */
         icg_expr(c0, out, outsz);
     }
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   §5  WP-03  CONTROL-FLOW TAC  (Elizabeth)
-   ───────────────────────────────────────────────────────────────────────────
-   Grammar rules handled:
-     if_stmt    → IF logical_expr : block else_clause
-     else_clause→ ELSE : block  |  ε
-     while_stmt → WHILE logical_expr : block
-     for_stmt   → FOR IDENTIFIER IN RANGE ( expr ) : block
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-/*  icg_block: walk the block node's children (stmt + stmt_list).          */
+/* Function to handle block nodes */
 static void icg_block(ParseNode *node)
 {
+    /* Check if the node is valid */
     if (!node)
         return;
+    /* Walk through the block node's children */
     for (int i = 0; i < node->child_count; i++)
     {
+        /* Evaluate each child node and execute the corresponding code */
         ParseNode *c = node->children[i];
         if (label_is(c, "stmt"))
             icg_stmt(c);
@@ -460,28 +440,13 @@ static void icg_block(ParseNode *node)
     }
 }
 
-/*  icg_if_stmt:
-    Pattern (with else):
-        condition = eval(logical_expr)
-        IF_FALSE_GOTO condition → L_else
-        [then block]
-        GOTO L_end
-      L_else:
-        [else block]
-      L_end:
-
-    Pattern (without else):
-        condition = eval(logical_expr)
-        IF_FALSE_GOTO condition → L_end
-        [then block]
-      L_end:                                                                 */
+/* Function to handle if statements */
 static void icg_if_stmt(ParseNode *node)
 {
     if (!node)
         return;
 
-    /* node children (from parser):
-       [0] KEYWORD_IF  [1] logical_expr  [2] COLON  [3] block  [4] else_clause */
+    /* Evaluate the logical expression */
     char cond[MAX_OPERAND];
     icg_logical_expr(child(node, 1), cond, sizeof(cond));
 
@@ -493,13 +458,15 @@ static void icg_if_stmt(ParseNode *node)
     new_label(l_else, sizeof(l_else));
     new_label(l_end, sizeof(l_end));
 
+    /* If the else clause exists */
     if (has_else)
     {
+        /* Check if the condition is false */
         emit_if_false(cond, l_else);
         icg_block(child(node, 3)); /* then block */
         emit_goto(l_end);
         emit_label(l_else);
-        /* else_clause children: [0] ELSE  [1] COLON  [2] block */
+        /* Evaluate the else block */
         icg_block(child(else_node, 2)); /* else block */
         emit_label(l_end);
     }
@@ -511,25 +478,21 @@ static void icg_if_stmt(ParseNode *node)
     }
 }
 
-/*  icg_while_stmt:
-      L_start:
-        condition = eval(logical_expr)
-        IF_FALSE_GOTO condition → L_end
-        [body]
-        GOTO L_start
-      L_end:                                                                 */
+/* Function to handle while statements */
 static void icg_while_stmt(ParseNode *node)
 {
     if (!node)
         return;
 
-    /* node children: [0] WHILE  [1] logical_expr  [2] COLON  [3] block    */
+    /* Create labels for the start and end of the loop */
     char l_start[MAX_OPERAND], l_end[MAX_OPERAND];
     new_label(l_start, sizeof(l_start));
     new_label(l_end, sizeof(l_end));
 
+    /* Emit the start label */
     emit_label(l_start);
 
+    /* Evaluate the logical expression */
     char cond[MAX_OPERAND];
     icg_logical_expr(child(node, 1), cond, sizeof(cond));
 
@@ -539,27 +502,13 @@ static void icg_while_stmt(ParseNode *node)
     emit_label(l_end);
 }
 
-/*  icg_for_stmt:
-    for IDENTIFIER in range(expr):  →  a C-style counted loop:
-
-        var = 0
-        t_limit = eval(expr)
-      L_start:
-        t_cmp = var < t_limit
-        IF_FALSE_GOTO t_cmp → L_end
-        [body]
-        t_inc = var + 1
-        var = t_inc
-        GOTO L_start
-      L_end:                                                                 */
+/* Function to handle for statements */
 static void icg_for_stmt(ParseNode *node)
 {
     if (!node)
         return;
 
-    /* node children (from parser):
-       [0] FOR  [1] IDENTIFIER  [2] IN  [3] RANGE
-       [4] LPAREN  [5] expr  [6] RPAREN  [7] COLON  [8] block             */
+    /* Extract the loop variable name */
     char var[MAX_OPERAND];
     extract_lexeme(child(node, 1), var, sizeof(var));
 
@@ -594,48 +543,39 @@ static void icg_for_stmt(ParseNode *node)
     emit_label(l_end);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   §6  WP-04  ASSIGN, PRINT & OUTPUT  (Iman)
-   ───────────────────────────────────────────────────────────────────────────
-   Grammar rules handled:
-     assign_stmt → IDENTIFIER = logical_expr
-     print_stmt  → PRINT ( logical_expr )
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-/*  icg_assign_stmt:
-    Evaluate the RHS expression, then emit:
-        ASSIGN  rhs_temp  ""  variable_name                                 */
+/* Function to handle assignment statements */
 static void icg_assign_stmt(ParseNode *node)
 {
     if (!node)
         return;
 
-    /* node children: [0] IDENTIFIER  [1] ASSIGN_OP  [2] logical_expr      */
+    /* Extract the variable name */
     char var_name[MAX_OPERAND];
     extract_lexeme(child(node, 0), var_name, sizeof(var_name));
 
+    /* Evaluate the right-hand side expression */
     char rhs[MAX_OPERAND];
     icg_logical_expr(child(node, 2), rhs, sizeof(rhs));
 
+    /* Emit the assignment instruction */
     emit("ASSIGN", rhs, "", var_name);
 }
 
-/*  icg_print_stmt:
-    Evaluate the argument, then emit:
-        PRINT  arg  ""  ""                                                  */
+/* Function to handle print statements */
 static void icg_print_stmt(ParseNode *node)
 {
     if (!node)
         return;
 
-    /* node children: [0] PRINT  [1] LPAREN  [2] logical_expr  [3] RPAREN  */
+    /* Evaluate the argument */
     char arg[MAX_OPERAND];
     icg_logical_expr(child(node, 2), arg, sizeof(arg));
 
+    /* Emit the print instruction */
     emit("PRINT", arg, "", "");
 }
 
-/*  icg_print_quads: format and print the full TAC listing to stdout.      */
+/* Function to print the generated intermediate code */
 void icg_print(void)
 {
     printf("=== INTERMEDIATE CODE (Three-Address Code) ===\n");
@@ -643,6 +583,7 @@ void icg_print(void)
            "Line", "Operation", "Arg1", "Arg2", "Result");
     printf("----------------------------------------------------------------------\n");
 
+    /* Loop through all generated quadruples */
     for (int i = 0; i < quad_count; i++)
     {
         Quad *q = &quads[i];
@@ -706,10 +647,7 @@ void icg_print(void)
     printf("Total instructions: %d\n\n", quad_count);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   §7  TOP-LEVEL TREE WALKERS
-   ═══════════════════════════════════════════════════════════════════════════ */
-
+/* Function to handle statement nodes */
 static void icg_stmt(ParseNode *node)
 {
     if (!node || node->child_count == 0)
@@ -718,22 +656,29 @@ static void icg_stmt(ParseNode *node)
     if (!inner)
         return;
 
+    /* Dispatch if the statement is an assignment */
     if (label_is(inner, "assign_stmt"))
         icg_assign_stmt(inner);
+    /* Dispatch if the statement is a print */
     else if (label_is(inner, "print_stmt"))
         icg_print_stmt(inner);
+    /* Dispatch if the statement is an if statement */
     else if (label_is(inner, "if_stmt"))
         icg_if_stmt(inner);
+    /* Dispatch if the statement is a while statement */
     else if (label_is(inner, "while_stmt"))
         icg_while_stmt(inner);
+    /* Dispatch if the statement is a for statement */
     else if (label_is(inner, "for_stmt"))
         icg_for_stmt(inner);
 }
 
+/* Function to handle stmt_list */
 static void icg_stmt_list(ParseNode *node)
 {
     if (!node)
         return;
+    /* Loop through all child nodes and handle each statement */
     for (int i = 0; i < node->child_count; i++)
     {
         ParseNode *c = node->children[i];
@@ -744,13 +689,15 @@ static void icg_stmt_list(ParseNode *node)
     }
 }
 
-/* ── Public entry point ──────────────────────────────────────────────────── */
+/* Function that is the entry point for intermediate code generation */
 void icg_generate(ParseNode *root)
 {
+    /* Check if the root node is valid */
     if (!root)
         return;
-    /* root->label == "program", its first child is stmt_list */
+    /* Get the statement list from the root node (Program) */
     ParseNode *stmt_list = child(root, 0);
     icg_stmt_list(stmt_list);
+    /* Print the generated intermediate code */
     icg_print();
 }
